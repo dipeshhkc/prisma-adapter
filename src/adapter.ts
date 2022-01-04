@@ -1,13 +1,14 @@
-import type { Adapter, Model } from 'casbin';
+import type { Adapter, Model,FilteredAdapter } from 'casbin';
 import type { CasbinRule } from '@prisma/client';
 
 import { Helper } from 'casbin';
 import { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
-export class PrismaAdapter implements Adapter {
+export class PrismaAdapter implements FilteredAdapter {
   #option?: Prisma.PrismaClientOptions;
   #prisma: PrismaClient;
+  #filtered = false;
 
   /**
    * @param option It should be PrismaClientOptions or PrismaClient.
@@ -20,6 +21,11 @@ export class PrismaAdapter implements Adapter {
       this.#option = option;
     }
   }
+  
+  
+  public isFiltered(): boolean {
+    return this.#filtered;
+  }
 
   async loadPolicy(model: Model): Promise<void> {
     const lines = await this.#prisma.casbinRule.findMany();
@@ -28,6 +34,16 @@ export class PrismaAdapter implements Adapter {
       this.#loadPolicyLine(line, model);
     }
   }
+  
+  // Loading policies based on filter condition
+  public async loadFilteredPolicy(model: Model, filter: object) {
+    const filteredLines = await this.#prisma.casbinRule.findMany(filter);
+    for (const line of filteredLines) {
+      this.loadPolicyLine(line, model);
+    }
+    this.#filtered = true;
+  }
+
 
   async savePolicy(model: Model): Promise<boolean> {
     await this.#prisma.$executeRaw`DELETE FROM casbin_rule;`;
